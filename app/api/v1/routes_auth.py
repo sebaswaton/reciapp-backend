@@ -20,8 +20,8 @@ def register(usuario: schemas_user.UsuarioCreate, db: Session = Depends(get_db))
     existing_user = db.query(Usuario).filter(Usuario.correo == usuario.correo).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
-    hashed_password = get_password_hash(usuario.contraseña)
-    nuevo_usuario = Usuario(nombre=usuario.nombre, correo=usuario.correo, contraseña=hashed_password, rol=usuario.rol)
+    hashed_password = get_password_hash(usuario.contrasena)
+    nuevo_usuario = Usuario(nombre=usuario.nombre, correo=usuario.correo, contrasena=hashed_password, rol=usuario.rol)
     db.add(nuevo_usuario)
     db.commit()
     db.refresh(nuevo_usuario)
@@ -30,7 +30,7 @@ def register(usuario: schemas_user.UsuarioCreate, db: Session = Depends(get_db))
 @router.post("/login")
 def login(form_data: schemas_user.UsuarioLogin, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.correo == form_data.correo).first()
-    if not usuario or not verify_password(form_data.contraseña, usuario.contraseña):
+    if not usuario or not verify_password(form_data.contrasena, usuario.contrasena):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales incorrectas")
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": str(usuario.id)}, expires_delta=access_token_expires)

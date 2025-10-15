@@ -1,17 +1,11 @@
-from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy import Column, Integer, String
 from app.models.base import Base
-import enum
-
-class RolUsuario(str,enum.Enum):
-    ciudadano = "ciudadano"
-    reciclador = "reciclador"
-    admin = "admin"
 
 class Usuario(Base):
     __tablename__ = "usuarios"
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    correo = Column(String, unique=True, nullable=False)
-    contrasena = Column(String, nullable=False)
-    rol = Column(Enum(RolUsuario), nullable=False)
+    nombre = Column(String(100), nullable=False)
+    correo = Column(String(120), unique=True, index=True, nullable=False)
+    contrasena = Column(String(255), nullable=False)
+    rol = Column(String(50), nullable=False)

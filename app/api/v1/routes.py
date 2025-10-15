@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.schemas import user as schemas_user, solicitud as schemas_solicitud
 from app.crud import crud_usuario, crud_solicitud, crud_servicio, crud_evidencia, crud_wallet
+from app.services.business_logic import asignar_servicio, registrar_evidencia_y_puntuar
+
 
 router = APIRouter()
 
@@ -164,3 +166,17 @@ def eliminar_wallet(usuario_id: int, db: Session = Depends(get_db)):
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet no encontrada")
     return {"detail": "Wallet eliminada correctamente"}
+
+
+# ===========================================================
+# 🔄 LÓGICA DE NEGOCIO
+# ===========================================================
+
+@router.post("/asignar-servicio/{solicitud_id}/{reciclador_id}")
+def asignar(db: Session = Depends(get_db), solicitud_id: int = None, reciclador_id: int = None):
+    return asignar_servicio(db, solicitud_id, reciclador_id)
+
+@router.post("/registrar-evidencia/{solicitud_id}")
+def registrar_evidencia(solicitud_id: int, evidencia_data: dict, db: Session = Depends(get_db)):
+    return registrar_evidencia_y_puntuar(db, solicitud_id, evidencia_data)
+

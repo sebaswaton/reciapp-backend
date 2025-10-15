@@ -23,4 +23,4 @@ class UsuarioOut(BaseModel):
 
 class UsuarioLogin(BaseModel):
     correo: EmailStr
-    contraseña: str
+    contrasena: str
