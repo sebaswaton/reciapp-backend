@@ -20,3 +20,7 @@ class UsuarioOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UsuarioLogin(BaseModel):
+    correo: EmailStr
+    contraseña: str
