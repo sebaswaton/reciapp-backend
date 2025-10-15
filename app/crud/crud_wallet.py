@@ -25,3 +25,15 @@ def delete_wallet(db: Session, usuario_id: int):
         db.delete(wallet)
         db.commit()
     return wallet
+
+def redeem_points(db: Session, usuario_id: int, puntos: float):
+    wallet = db.query(Wallet).filter(Wallet.usuario_id == usuario_id).first()
+    if not wallet:
+        return None
+    if wallet.puntos < puntos:
+        return "INSUFFICIENT_POINTS"
+    wallet.puntos -= puntos
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+

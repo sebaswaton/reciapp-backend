@@ -6,6 +6,7 @@ app = FastAPI()
 def healthcheck():
     return {"status": "ok"}
 
+from app.api.v1 import routes
 from app.models.base import Base
 from app.db.session import engine
 from app import models  # Importa todo para registrar las clases
@@ -13,6 +14,7 @@ from app.models import user, solicitud, servicio, evidencia, wallet
 from app.api.v1 import routes_auth
 
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
+app.include_router(routes.router, prefix="/api", tags=["Usuarios y Recursos"])
 
 
 Base.metadata.create_all(bind=engine)
