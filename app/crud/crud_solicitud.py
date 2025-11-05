@@ -1,13 +1,15 @@
 from sqlalchemy.orm import Session
 from app.models.solicitud import Solicitud
 from app.schemas.solicitud import SolicitudCreate
+from datetime import datetime
 
-def create_solicitud(db: Session, solicitud: SolicitudCreate):
-    db_solicitud = Solicitud(**solicitud.model_dump())
-    db.add(db_solicitud)
+
+def create_solicitud(db: Session, solicitud_data: dict):
+    nueva_solicitud = Solicitud(**solicitud_data)
+    db.add(nueva_solicitud)
     db.commit()
-    db.refresh(db_solicitud)
-    return db_solicitud
+    db.refresh(nueva_solicitud)
+    return nueva_solicitud
 
 def get_solicitud(db: Session, solicitud_id: int):
     return db.query(Solicitud).filter(Solicitud.id == solicitud_id).first()

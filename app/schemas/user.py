@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from enum import Enum
 
 class RolUsuario(str, Enum):
@@ -18,9 +18,8 @@ class UsuarioOut(BaseModel):
     correo: EmailStr
     rol: RolUsuario
 
-    class Config:
-        from_attributes = True
-
 class UsuarioLogin(BaseModel):
     correo: EmailStr
     contrasena: str
+
+    model_config = ConfigDict(from_attributes=True)

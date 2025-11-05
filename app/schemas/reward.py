@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class RewardBase(BaseModel):
@@ -12,5 +12,4 @@ class RewardCreate(RewardBase):
 class RewardOut(RewardBase):
     id: int
 
-    class Config:
-        orm_mode = True  # ✅ usa 'orm_mode' para Pydantic v1 (Python 3.9)
+    model_config = ConfigDict(from_attributes=True)

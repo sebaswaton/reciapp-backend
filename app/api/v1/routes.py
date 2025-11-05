@@ -1,3 +1,4 @@
+import datetime
 from io import StringIO
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -13,6 +14,8 @@ from app.crud import crud_reward, crud_wallet
 from app.schemas.reward import RewardCreate, RewardOut
 from fastapi.responses import StreamingResponse
 from app.services.analytics import get_resumen_general, get_resumen_por_tipo, export_resumen_csv
+from app.api.v1.dependencies import get_current_user
+
 
 
 router = APIRouter()
@@ -84,8 +87,17 @@ def eliminar_usuario(usuario_id: int, db: Session = Depends(get_db), _: Usuario 
 
 # Ciudadanos pueden crear solicitudes
 @router.post("/solicitudes", response_model=schemas_solicitud.SolicitudOut)
-def crear_solicitud(solicitud: schemas_solicitud.SolicitudCreate, db: Session = Depends(get_db), _: Usuario = Depends(require_role("ciudadano"))):
-    return crud_solicitud.create_solicitud(db, solicitud)
+def crear_solicitud(
+    solicitud: schemas_solicitud.SolicitudCreate, 
+    db: Session = Depends(get_db), 
+    current_user: Usuario = Depends(get_current_user)
+):
+    # Agregar el usuario_id del usuario autenticado
+    solicitud_dict = solicitud.dict()
+    solicitud_dict['usuario_id'] = current_user.id
+    solicitud_dict['fecha_solicitud'] = datetime.datetime.now()  # ✅ FIX: datetime.datetime.now()
+    
+    return crud_solicitud.create_solicitud(db, solicitud_dict)
 
 # Admin o reciclador pueden listar solicitudes
 @router.get("/solicitudes", response_model=list[schemas_solicitud.SolicitudOut])
