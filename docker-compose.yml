@@ -1,19 +1,6 @@
 version: "3.9"
 
 services:
-  web:
-    build: .
-    container_name: reciapp-api
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./app:/code/app
-    environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/reciapp
-    depends_on:
-      db:
-        condition: service_healthy
-
   db:
     image: postgres:15
     container_name: reciapp-db
@@ -26,11 +13,33 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reciapp-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  web:
+    build: .
+    container_name: reciapp-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/code/app
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/reciapp
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - reciapp-network
+
 volumes:
   postgres_data:
+
+networks:
+  reciapp-network:
+    driver: bridge
