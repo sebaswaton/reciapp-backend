@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import socketio
+import time
 
 # Importaciones de modelos y base de datos
 from app.models.base import Base
@@ -20,8 +21,7 @@ app = FastAPI()
 # Crear servidor Socket.IO
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=    "https://enchanting-biscochitos-af791d.netlify.app",
-     # En producción, especifica tus dominios
+    cors_allowed_origins="https://enchanting-biscochitos-af791d.netlify.app",
     logger=True,
     engineio_logger=True
 )
@@ -35,6 +35,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Evento de startup para crear tablas con reintentos
+@app.on_event("startup")
+async def startup_event():
+    max_retries = 30
+    retry_interval = 2  # segundos
+    
+    for attempt in range(max_retries):
+        try:
+            # Intentar crear las tablas
+            Base.metadata.create_all(bind=engine)
+            print("✅ Tablas creadas exitosamente")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⏳ Esperando a la base de datos... intento {attempt + 1}/{max_retries}")
+                print(f"   Error: {str(e)}")
+                time.sleep(retry_interval)
+            else:
+                print(f"❌ No se pudo conectar a la base de datos después de {max_retries} intentos")
+                print(f"   Error final: {str(e)}")
+                raise
+
 # Healthcheck
 @app.get("/healthcheck")
 def healthcheck():
@@ -45,9 +67,6 @@ app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(routes.router, prefix="/api", tags=["Usuarios y Recursos"])
 app.include_router(api_router)
 app.include_router(realtime.router, prefix="/realtime", tags=["Real Time"])
-
-# Crear tablas en la base de datos
-Base.metadata.create_all(bind=engine)
 
 # Event handlers de Socket.IO
 @sio.event
