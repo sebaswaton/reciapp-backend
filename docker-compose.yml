@@ -14,20 +14,19 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reciapp"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   web:
     build: .
-    container_name: reciapp-api
+    container_name: reciapp-backend-web  # Cambié esto para que coincida
     ports:
       - "8000:8000"
     volumes:
       - ./app:/code/app
     environment:
-      # Cambia @reciapp-db por @db
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/reciapp
     depends_on:
       db:
