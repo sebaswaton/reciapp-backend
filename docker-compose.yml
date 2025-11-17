@@ -27,13 +27,12 @@ services:
     volumes:
       - ./app:/code/app
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@reciapp-db:5432/reciapp
+      # Cambia @reciapp-db por @db
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/reciapp
     depends_on:
       db:
         condition: service_healthy
     restart: on-failure
-    links:
-      - db:reciapp-db
 
 volumes:
   postgres_data:
