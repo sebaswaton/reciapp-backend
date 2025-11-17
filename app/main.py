@@ -20,7 +20,8 @@ app = FastAPI()
 # Crear servidor Socket.IO
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*',  # En producción, especifica tus dominios
+    cors_allowed_origins=    "https://enchanting-biscochitos-af791d.netlify.app",
+     # En producción, especifica tus dominios
     logger=True,
     engineio_logger=True
 )
