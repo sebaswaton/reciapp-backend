@@ -13,8 +13,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - reciapp-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -29,17 +27,13 @@ services:
     volumes:
       - ./app:/code/app
     environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/reciapp
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@reciapp-db:5432/reciapp
     depends_on:
       db:
         condition: service_healthy
     restart: on-failure
-    networks:
-      - reciapp-network
+    links:
+      - db:reciapp-db
 
 volumes:
   postgres_data:
-
-networks:
-  reciapp-network:
-    driver: bridge
