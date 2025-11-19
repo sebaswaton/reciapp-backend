@@ -9,7 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código
 COPY app app
 
-
+# Definir la variable de entorno con un valor por defecto
+ENV DATABASE_URL="postgresql+psycopg2://postgres:postgres@reciapp-db:5432/reciapp"
 
 # Comando de inicio
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
