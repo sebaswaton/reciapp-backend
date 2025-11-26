@@ -12,5 +12,5 @@ COPY app app
 # Definir la variable de entorno con un valor por defecto
 ENV DATABASE_URL="postgresql://postgres:LQMzMMbONGUjMzsgsFioDwbmfbxbOlgv@postgres.railway.internal:5432/railway"
 
-# Comando de inicio
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando de inicio - usar shell form para expansión de variables
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
