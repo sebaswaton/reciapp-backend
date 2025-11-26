@@ -15,10 +15,13 @@ from app.schemas.reward import RewardCreate, RewardOut
 from fastapi.responses import StreamingResponse
 from app.services.analytics import get_resumen_general, get_resumen_por_tipo, export_resumen_csv
 from app.api.v1.dependencies import get_current_user
-
-
+import httpx  # 🔹 NUEVO: Para notificaciones HTTP
+import os
 
 router = APIRouter()
+
+# 🔹 NUEVO: URL base para notificaciones
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 # ===========================================================
 # 🧱 DEPENDENCIA DE BASE DE DATOS
@@ -85,9 +88,9 @@ def eliminar_usuario(usuario_id: int, db: Session = Depends(get_db), _: Usuario 
 # 📦 SOLICITUDES
 # ===========================================================
 
-# Ciudadanos pueden crear solicitudes
+# 🔹 MODIFICADO: Ciudadanos pueden crear solicitudes + notificación WebSocket
 @router.post("/solicitudes", response_model=schemas_solicitud.SolicitudOut)
-def crear_solicitud(
+async def crear_solicitud(
     solicitud: schemas_solicitud.SolicitudCreate, 
     db: Session = Depends(get_db), 
     current_user: Usuario = Depends(get_current_user)
@@ -95,13 +98,55 @@ def crear_solicitud(
     # Agregar el usuario_id del usuario autenticado
     solicitud_dict = solicitud.dict()
     solicitud_dict['usuario_id'] = current_user.id
-    solicitud_dict['fecha_solicitud'] = datetime.datetime.now()  # ✅ FIX: datetime.datetime.now()
+    solicitud_dict['fecha_solicitud'] = datetime.datetime.now()
     
-    return crud_solicitud.create_solicitud(db, solicitud_dict)
+    # Crear la solicitud en la base de datos
+    nueva_solicitud = crud_solicitud.create_solicitud(db, solicitud_dict)
+    
+    # 🔹 NUEVO: Notificar vía WebSocket después de crear la solicitud
+    try:
+        # Convertir la solicitud a dict para enviar por WebSocket
+        solicitud_dict_ws = {
+            "id": nueva_solicitud.id,
+            "ciudadano_id": nueva_solicitud.usuario_id,
+            "tipo_material": nueva_solicitud.tipo_material,
+            "cantidad": float(nueva_solicitud.cantidad) if nueva_solicitud.cantidad else 0,
+            "descripcion": nueva_solicitud.descripcion,
+            "latitud": float(nueva_solicitud.latitud) if nueva_solicitud.latitud else 0,
+            "longitud": float(nueva_solicitud.longitud) if nueva_solicitud.longitud else 0,
+            "direccion": nueva_solicitud.direccion,
+            "estado": nueva_solicitud.estado,
+            "created_at": nueva_solicitud.fecha_solicitud.isoformat() if nueva_solicitud.fecha_solicitud else None
+        }
+        
+        # Llamar al endpoint de notificación de forma asíncrona
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BASE_URL}/api/notify/solicitud_creada",
+                json={
+                    "solicitud": solicitud_dict_ws,
+                    "ciudadano_id": current_user.id
+                },
+                timeout=5.0
+            )
+            if response.status_code == 200:
+                print(f"✅ Notificación WebSocket enviada para solicitud {nueva_solicitud.id}")
+            else:
+                print(f"⚠️ Error en notificación: {response.status_code}")
+    except Exception as e:
+        print(f"⚠️ Error enviando notificación WebSocket: {e}")
+        # No fallar la creación de solicitud si falla la notificación
+    
+    return nueva_solicitud
 
 # Admin o reciclador pueden listar solicitudes
 @router.get("/solicitudes", response_model=list[schemas_solicitud.SolicitudOut])
-def listar_solicitudes(db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
+def listar_solicitudes(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    # 🔹 MODIFICADO: Permitir que ciudadanos vean sus propias solicitudes
+    if current_user.rol == "ciudadano":
+        # Filtrar solo las solicitudes del ciudadano actual
+        return [s for s in crud_solicitud.get_solicitudes(db) if s.usuario_id == current_user.id]
+    # Admin y recicladores ven todas
     return crud_solicitud.get_solicitudes(db)
 
 @router.get("/solicitudes/{solicitud_id}", response_model=schemas_solicitud.SolicitudOut)
@@ -116,17 +161,46 @@ def obtener_solicitud(solicitud_id: int, db: Session = Depends(get_db), current_
 
     return solicitud
 
+# 🔹 MODIFICADO: Actualizar solicitud + notificación WebSocket
 @router.put("/solicitudes/{solicitud_id}", response_model=schemas_solicitud.SolicitudOut)
-def actualizar_solicitud(solicitud_id: int, nuevos_datos: dict, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+async def actualizar_solicitud(
+    solicitud_id: int, 
+    nuevos_datos: dict, 
+    db: Session = Depends(get_db), 
+    current_user: Usuario = Depends(get_current_user)
+):
     solicitud = crud_solicitud.get_solicitud(db, solicitud_id)
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Solo admin o dueño
-    if current_user.rol != "admin" and solicitud.usuario_id != current_user.id:
+    # Permitir que recicladores actualicen solicitudes (para aceptar/completar)
+    if current_user.rol == "ciudadano" and solicitud.usuario_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permisos para modificar esta solicitud")
-
-    return crud_solicitud.update_solicitud(db, solicitud_id, nuevos_datos)
+    
+    # Actualizar la solicitud
+    solicitud_actualizada = crud_solicitud.update_solicitud(db, solicitud_id, nuevos_datos)
+    
+    # 🔹 NUEVO: Notificar cambios de estado vía WebSocket
+    if "estado" in nuevos_datos or "reciclador_id" in nuevos_datos:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{BASE_URL}/api/notify/solicitud_actualizada",
+                    json={
+                        "solicitud_id": solicitud_actualizada.id,
+                        "ciudadano_id": solicitud_actualizada.usuario_id,
+                        "estado": solicitud_actualizada.estado
+                    },
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    print(f"✅ Notificación de actualización enviada para solicitud {solicitud_id}")
+                else:
+                    print(f"⚠️ Error en notificación: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Error enviando notificación de actualización: {e}")
+    
+    return solicitud_actualizada
 
 @router.delete("/solicitudes/{solicitud_id}")
 def eliminar_solicitud(solicitud_id: int, db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
