@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import socketio
@@ -17,11 +18,11 @@ from app.services import realtime
 
 # Crear la aplicación FastAPI
 app = FastAPI()
-
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
 # Crear servidor Socket.IO
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins="https://enchanting-biscochitos-af791d.netlify.app",
+    cors_allowed_origins=FRONTEND_URL,
     logger=True,
     engineio_logger=True
 )
@@ -29,7 +30,7 @@ sio = socketio.AsyncServer(
 # Configurar CORS para FastAPI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # en producción, limita esto a tu dominio específico
+    allow_origins=[FRONTEND_URL],  # en producción, limita esto a tu dominio específico
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
