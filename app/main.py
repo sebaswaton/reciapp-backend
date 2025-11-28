@@ -88,5 +88,5 @@ async def mensaje(sid, data):
 socket_app = socketio.ASGIApp(
     sio,
     app,
-    socketio_path='socket.io'  # Cambiar de '/ws' a 'socket.io' (sin barra inicial)
+    socketio_path='/socket.io'  # Cambiar de '/ws' a 'socket.io' (sin barra inicial)
 )
