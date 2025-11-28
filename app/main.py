@@ -19,10 +19,11 @@ from app.services import realtime
 # Crear la aplicación FastAPI
 app = FastAPI()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
-# Crear servidor Socket.IO
+
+# Crear servidor Socket.IO con configuración CORS mejorada
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=FRONTEND_URL,
+    cors_allowed_origins='*',  # Permite todas las conexiones (cambiar en producción)
     logger=True,
     engineio_logger=True
 )
@@ -30,7 +31,7 @@ sio = socketio.AsyncServer(
 # Configurar CORS para FastAPI
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],  # en producción, limita esto a tu dominio específico
+    allow_origins=["*"] if FRONTEND_URL == "*" else [FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
