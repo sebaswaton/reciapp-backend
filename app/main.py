@@ -3,7 +3,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import time
 import json
-from typing import Dict, Set
+from typing import Dict
 
 # Importaciones de modelos y base de datos
 from app.models.base import Base
