@@ -88,5 +88,5 @@ async def mensaje(sid, data):
 socket_app = socketio.ASGIApp(
     sio,
     app,
-    socketio_path='/ws'  # Esto hace que Socket.IO escuche en /ws/*
+    socketio_path='socket.io'  # Cambiar de '/ws' a 'socket.io' (sin barra inicial)
 )
