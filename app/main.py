@@ -1,13 +1,14 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import socketio
 import time
+import json
+from typing import Dict, Set
 
 # Importaciones de modelos y base de datos
 from app.models.base import Base
 from app.db.session import engine
-from app import models  # Importa todo para registrar las clases
+from app import models
 from app.models import user, solicitud, servicio, evidencia, wallet
 
 # Importaciones de rutas
@@ -20,14 +21,6 @@ from app.services import realtime
 app = FastAPI()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
 
-# Crear servidor Socket.IO con configuración CORS mejorada
-sio = socketio.AsyncServer(
-    async_mode='asgi',
-    cors_allowed_origins='*',  # Permite todas las conexiones (cambiar en producción)
-    logger=True,
-    engineio_logger=True
-)
-
 # Configurar CORS para FastAPI
 app.add_middleware(
     CORSMiddleware,
@@ -37,15 +30,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Gestor de conexiones WebSocket
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+        print(f"✅ Cliente conectado: {user_id}")
+
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+            print(f"❌ Cliente desconectado: {user_id}")
+
+    async def send_personal_message(self, message: dict, user_id: str):
+        if user_id in self.active_connections:
+            await self.active_connections[user_id].send_text(json.dumps(message))
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.values():
+            await connection.send_text(json.dumps(message))
+
+manager = ConnectionManager()
+
 # Evento de startup para crear tablas con reintentos
 @app.on_event("startup")
 async def startup_event():
     max_retries = 30
-    retry_interval = 2  # segundos
+    retry_interval = 2
     
     for attempt in range(max_retries):
         try:
-            # Intentar crear las tablas
             Base.metadata.create_all(bind=engine)
             print("✅ Tablas creadas exitosamente")
             break
@@ -64,29 +81,55 @@ async def startup_event():
 def healthcheck():
     return {"status": "ok"}
 
+# WebSocket endpoint
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            message_type = message.get("type")
+
+            print(f"📩 Mensaje recibido de {user_id}: {message_type}")
+
+            if message_type == "nueva_solicitud":
+                # Broadcast a todos los recicladores
+                await manager.broadcast({
+                    "type": "nueva_solicitud",
+                    "solicitud": message.get("solicitud")
+                })
+
+            elif message_type == "aceptar_solicitud":
+                # Notificar al ciudadano que creó la solicitud
+                solicitud_id = message.get("solicitud_id")
+                await manager.broadcast({
+                    "type": "solicitud_aceptada",
+                    "solicitud_id": solicitud_id,
+                    "reciclador_id": user_id
+                })
+
+            elif message_type == "ubicacion_reciclador":
+                # Enviar ubicación del reciclador
+                await manager.broadcast({
+                    "type": "ubicacion_reciclador",
+                    "lat": message.get("lat"),
+                    "lng": message.get("lng"),
+                    "solicitud_id": message.get("solicitud_id")
+                })
+
+            elif message_type == "rechazar_solicitud":
+                solicitud_id = message.get("solicitud_id")
+                await manager.broadcast({
+                    "type": "solicitud_rechazada",
+                    "solicitud_id": solicitud_id
+                })
+
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+
 # Incluir routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(routes.router, prefix="/api", tags=["Usuarios y Recursos"])
 app.include_router(api_router)
 app.include_router(realtime.router, prefix="/realtime", tags=["Real Time"])
-
-# Event handlers de Socket.IO
-@sio.event
-async def connect(sid, environ):
-    print(f"Cliente conectado: {sid}")
-
-@sio.event
-async def disconnect(sid):
-    print(f"Cliente desconectado: {sid}")
-
-@sio.event
-async def mensaje(sid, data):
-    print(f"Mensaje recibido de {sid}: {data}")
-    await sio.emit('respuesta', {'mensaje': 'Recibido'}, room=sid)
-
-# Envolver la app de FastAPI con Socket.IO
-socket_app = socketio.ASGIApp(
-    sio,
-    app,
-    socketio_path='/socket.io'  # Cambiar de '/ws' a 'socket.io' (sin barra inicial)
-)
