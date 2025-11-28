@@ -50,8 +50,13 @@ class ConnectionManager:
             await self.active_connections[user_id].send_text(json.dumps(message))
 
     async def broadcast(self, message: dict):
-        for connection in self.active_connections.values():
-            await connection.send_text(json.dumps(message))
+        print(f"📢 Broadcasting a {len(self.active_connections)} conexiones activas")
+        for user_id, connection in self.active_connections.items():
+            try:
+                await connection.send_text(json.dumps(message))
+                print(f"   ✅ Mensaje enviado a usuario {user_id}")
+            except Exception as e:
+                print(f"   ❌ Error enviando a usuario {user_id}: {e}")
 
 manager = ConnectionManager()
 
@@ -85,6 +90,7 @@ def healthcheck():
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(user_id, websocket)
+    print(f"👥 Conexiones activas: {len(manager.active_connections)}")
     try:
         while True:
             data = await websocket.receive_text()
@@ -92,13 +98,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             message_type = message.get("type")
 
             print(f"📩 Mensaje recibido de {user_id}: {message_type}")
+            print(f"   Contenido: {message}")
 
             if message_type == "nueva_solicitud":
                 # Broadcast a todos los recicladores
-                await manager.broadcast({
+                broadcast_message = {
                     "type": "nueva_solicitud",
                     "solicitud": message.get("solicitud")
-                })
+                }
+                print(f"🔔 Broadcasting nueva solicitud a todos los usuarios")
+                await manager.broadcast(broadcast_message)
 
             elif message_type == "aceptar_solicitud":
                 # Notificar al ciudadano que creó la solicitud
@@ -127,6 +136,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 
     except WebSocketDisconnect:
         manager.disconnect(user_id)
+        print(f"👥 Conexiones activas después de desconexión: {len(manager.active_connections)}")
 
 # Incluir routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
