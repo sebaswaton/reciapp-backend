@@ -7,4 +7,6 @@ class Reward(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
     descripcion = Column(String)
-    costo_puntos = Column(Float, nullable=False)
+    costo_puntos = Column(Integer, nullable=False)
+    stock = Column(Integer, default=0)  # NUEVO: Stock disponible
+    imagen_url = Column(String, nullable=True)

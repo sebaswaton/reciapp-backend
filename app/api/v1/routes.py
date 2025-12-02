@@ -196,17 +196,38 @@ def eliminar_evidencia(evidencia_id: int, db: Session = Depends(get_db), _: Usua
 def crear_wallet(usuario_id: int, db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
     return crud_wallet.create_wallet(db, usuario_id)
 
-@router.get("/wallets/{usuario_id}")
-def obtener_wallet(usuario_id: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    wallet = crud_wallet.get_wallet(db, usuario_id)
+# 🔹 IMPORTANTE: Este endpoint debe ir ANTES del GET /wallets/{usuario_id}
+@router.post("/wallets/{usuario_id}/redeem/{reward_id}")
+def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    """Canjear puntos por una recompensa"""
+    from app.models.reward import Reward
+    
+    # Verificar que existe la recompensa
+    reward = db.query(Reward).filter(Reward.id == reward_id).first()
+    if not reward:
+        raise HTTPException(status_code=404, detail="Recompensa no encontrada")
+    
+    # NUEVO: Verificar stock disponible
+    if reward.stock <= 0:
+        raise HTTPException(status_code=400, detail="Recompensa agotada. No hay stock disponible.")
+    
+    # Verificar y descontar puntos
+    wallet = crud_wallet.redeem_points(db, usuario_id, reward.costo_puntos)
+    if wallet == "INSUFFICIENT_POINTS":
+        raise HTTPException(status_code=400, detail="Puntos insuficientes para canjear esta recompensa")
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet no encontrada")
+    
+    # NUEVO: Decrementar stock
+    reward.stock -= 1
+    db.commit()
+    db.refresh(reward)
 
-    # Solo admin o el propio usuario puede verla
-    if current_user.rol != "admin" and current_user.id != usuario_id:
-        raise HTTPException(status_code=403, detail="No puedes acceder a esta wallet")
-
-    return wallet
+    return {
+        "mensaje": f"Canje exitoso de '{reward.nombre}'",
+        "puntos_restantes": wallet.puntos,
+        "stock_restante": reward.stock
+    }
 
 @router.put("/wallets/{usuario_id}/add")
 def agregar_puntos(usuario_id: int, puntos: float, db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
@@ -214,6 +235,34 @@ def agregar_puntos(usuario_id: int, puntos: float, db: Session = Depends(get_db)
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet no encontrada")
     return {"detail": f"Se agregaron {puntos} puntos al usuario {usuario_id}"}
+
+@router.get("/wallets/{usuario_id}")
+def obtener_wallet(usuario_id: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    """Obtener wallet de un usuario. Si no existe, crear uno nuevo."""
+    wallet = db.query(Wallet).filter(Wallet.usuario_id == usuario_id).first()
+    
+    # Si no existe, crear uno nuevo
+    if not wallet:
+        wallet = Wallet(
+            usuario_id=usuario_id,
+            puntos=0,
+            saldo=0.0
+        )
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+    
+    # Solo admin o el propio usuario puede verla
+    if current_user.rol != "admin" and current_user.id != usuario_id:
+        raise HTTPException(status_code=403, detail="No puedes acceder a esta wallet")
+
+    return {
+        "id": wallet.id,
+        "usuario_id": wallet.usuario_id,
+        "puntos": wallet.puntos,
+        "saldo": wallet.saldo,
+        "fecha_creacion": wallet.fecha_creacion
+    }
 
 @router.delete("/wallets/{usuario_id}")
 def eliminar_wallet(usuario_id: int, db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
@@ -272,25 +321,8 @@ def eliminar_reward(reward_id: int, db: Session = Depends(get_db)):
     return {"detail": "Recompensa eliminada correctamente"}
 
 # ===========================================================
-# 💱 CANJE DE PUNTOS
+# 📊 ANALYTICS
 # ===========================================================
-
-@router.post("/wallets/{usuario_id}/redeem/{reward_id}")
-def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db)):
-    reward = crud_reward.get_reward(db, reward_id)
-    if not reward:
-        raise HTTPException(status_code=404, detail="Recompensa no encontrada")
-
-    wallet = crud_wallet.redeem_points(db, usuario_id, reward.costo_puntos)
-    if wallet == "INSUFFICIENT_POINTS":
-        raise HTTPException(status_code=400, detail="Puntos insuficientes para canjear esta recompensa")
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Wallet no encontrada")
-
-    return {
-        "mensaje": f"Canje exitoso de '{reward.nombre}'",
-        "puntos_restantes": wallet.puntos
-    }
 
 @router.get("/analytics/resumen")
 def resumen_general(db: Session = Depends(get_db)):
@@ -308,36 +340,3 @@ def exportar_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reportes_reciclaje.csv"}
     )
-
-# 🔹 Endpoint para obtener wallet de un usuario
-@router.get("/wallets/{usuario_id}", response_model=dict)
-def get_wallet_by_user(
-    usuario_id: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)  # ✅ CORREGIDO: Usuario en lugar de User
-):
-    """
-    Obtener el wallet de un usuario por su ID.
-    Si no existe, crear uno nuevo con puntos en 0.
-    """
-    # Buscar wallet existente
-    wallet = db.query(Wallet).filter(Wallet.usuario_id == usuario_id).first()
-    
-    # Si no existe, crear uno nuevo
-    if not wallet:
-        wallet = Wallet(
-            usuario_id=usuario_id,
-            puntos=0,
-            saldo=0.0
-        )
-        db.add(wallet)
-        db.commit()
-        db.refresh(wallet)
-    
-    return {
-        "id": wallet.id,
-        "usuario_id": wallet.usuario_id,
-        "puntos": wallet.puntos,
-        "saldo": wallet.saldo,
-        "fecha_creacion": wallet.fecha_creacion
-    }
