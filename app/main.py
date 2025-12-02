@@ -14,7 +14,6 @@ from app.models import user, solicitud, servicio, evidencia, wallet
 # Importaciones de rutas
 from app.api.v1 import routes
 from app.api.v1 import routes_auth
-from app.api.v1 import routes_wallet  # NUEVO
 from app.api.v1.routes import router as api_router
 from app.services import realtime
 
@@ -152,6 +151,5 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 # Incluir routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(routes.router, prefix="/api", tags=["Usuarios y Recursos"])
-app.include_router(routes_wallet.router, prefix="/api", tags=["Wallet"])  # NUEVO
 app.include_router(api_router)
 app.include_router(realtime.router, prefix="/realtime", tags=["Real Time"])
