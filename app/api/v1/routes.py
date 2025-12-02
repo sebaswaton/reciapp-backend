@@ -258,8 +258,7 @@ def obtener_wallet(usuario_id: int, db: Session = Depends(get_db), current_user:
     return {
         "id": wallet.id,
         "usuario_id": wallet.usuario_id,
-        "puntos": wallet.puntos,
-        "fecha_creacion": wallet.fecha_creacion
+        "puntos": wallet.puntos
     }
 
 @router.delete("/wallets/{usuario_id}")
