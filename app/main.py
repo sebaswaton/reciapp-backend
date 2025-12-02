@@ -14,6 +14,7 @@ from app.models import user, solicitud, servicio, evidencia, wallet
 # Importaciones de rutas
 from app.api.v1 import routes
 from app.api.v1 import routes_auth
+from app.api.v1 import routes_wallet  # NUEVO
 from app.api.v1.routes import router as api_router
 from app.services import realtime
 
@@ -118,6 +119,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                     "reciclador_id": user_id
                 })
 
+            elif message_type == "cancelar_solicitud":
+                # Notificar a todos que la solicitud fue cancelada
+                solicitud_id = message.get("solicitud_id")
+                print(f"❌ Solicitud {solicitud_id} cancelada por usuario {user_id}")
+                await manager.broadcast({
+                    "type": "solicitud_cancelada",
+                    "solicitud_id": solicitud_id,
+                    "usuario_id": user_id
+                })
+
             elif message_type == "ubicacion_reciclador":
                 # Enviar ubicación del reciclador
                 await manager.broadcast({
@@ -141,5 +152,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 # Incluir routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
 app.include_router(routes.router, prefix="/api", tags=["Usuarios y Recursos"])
+app.include_router(routes_wallet.router, prefix="/api", tags=["Wallet"])  # NUEVO
 app.include_router(api_router)
 app.include_router(realtime.router, prefix="/realtime", tags=["Real Time"])

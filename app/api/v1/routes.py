@@ -307,3 +307,38 @@ def exportar_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reportes_reciclaje.csv"}
     )
+
+# 🔹 Endpoint para obtener wallet de un usuario
+@router.get("/wallets/{usuario_id}", response_model=dict)
+def get_wallet_by_user(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtener el wallet de un usuario por su ID.
+    Si no existe, crear uno nuevo con puntos en 0.
+    """
+    from app.models.wallet import Wallet
+    
+    # Buscar wallet existente
+    wallet = db.query(Wallet).filter(Wallet.usuario_id == usuario_id).first()
+    
+    # Si no existe, crear uno nuevo
+    if not wallet:
+        wallet = Wallet(
+            usuario_id=usuario_id,
+            puntos=0,
+            saldo=0.0
+        )
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+    
+    return {
+        "id": wallet.id,
+        "usuario_id": wallet.usuario_id,
+        "puntos": wallet.puntos,
+        "saldo": wallet.saldo,
+        "fecha_creacion": wallet.fecha_creacion
+    }
