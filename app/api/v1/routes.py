@@ -8,6 +8,7 @@ from app.crud import crud_usuario, crud_solicitud, crud_servicio, crud_evidencia
 from app.services.business_logic import asignar_servicio, registrar_evidencia_y_puntuar
 from app.api.v1.dependencies import get_current_user, require_role
 from app.models.user import Usuario
+from app.models.wallet import Wallet  # NUEVO
 from app.services.notifications import notify_points_added, notify_service_assigned
 from app.services.dashboard import get_dashboard_data
 from app.crud import crud_reward, crud_wallet
@@ -313,14 +314,12 @@ def exportar_csv(db: Session = Depends(get_db)):
 def get_wallet_by_user(
     usuario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_user)  # ✅ CORREGIDO: Usuario en lugar de User
 ):
     """
     Obtener el wallet de un usuario por su ID.
     Si no existe, crear uno nuevo con puntos en 0.
     """
-    from app.models.wallet import Wallet
-    
     # Buscar wallet existente
     wallet = db.query(Wallet).filter(Wallet.usuario_id == usuario_id).first()
     
