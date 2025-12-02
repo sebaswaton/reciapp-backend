@@ -207,7 +207,7 @@ def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db
     if not reward:
         raise HTTPException(status_code=404, detail="Recompensa no encontrada")
     
-    # NUEVO: Verificar stock disponible
+    # Verificar stock disponible
     if reward.stock <= 0:
         raise HTTPException(status_code=400, detail="Recompensa agotada. No hay stock disponible.")
     
@@ -218,7 +218,7 @@ def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet no encontrada")
     
-    # NUEVO: Decrementar stock
+    # Decrementar stock
     reward.stock -= 1
     db.commit()
     db.refresh(reward)
@@ -245,8 +245,7 @@ def obtener_wallet(usuario_id: int, db: Session = Depends(get_db), current_user:
     if not wallet:
         wallet = Wallet(
             usuario_id=usuario_id,
-            puntos=0,
-            saldo=0.0
+            puntos=0
         )
         db.add(wallet)
         db.commit()
@@ -260,7 +259,6 @@ def obtener_wallet(usuario_id: int, db: Session = Depends(get_db), current_user:
         "id": wallet.id,
         "usuario_id": wallet.usuario_id,
         "puntos": wallet.puntos,
-        "saldo": wallet.saldo,
         "fecha_creacion": wallet.fecha_creacion
     }
 
