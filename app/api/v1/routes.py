@@ -203,13 +203,9 @@ def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db
     from app.models.reward import Reward
     
     # Verificar que existe la recompensa
-    reward = db.query(Reward).filter(Reward.id == reward_id).first()
+    reward = crud_reward.get_reward(db, reward_id)  # ✅ Usar CRUD en lugar de query directo
     if not reward:
         raise HTTPException(status_code=404, detail="Recompensa no encontrada")
-    
-    # Verificar stock disponible
-    if reward.stock <= 0:
-        raise HTTPException(status_code=400, detail="Recompensa agotada. No hay stock disponible.")
     
     # Verificar y descontar puntos
     wallet = crud_wallet.redeem_points(db, usuario_id, reward.costo_puntos)
@@ -217,16 +213,10 @@ def canjear_puntos(usuario_id: int, reward_id: int, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail="Puntos insuficientes para canjear esta recompensa")
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet no encontrada")
-    
-    # Decrementar stock
-    reward.stock -= 1
-    db.commit()
-    db.refresh(reward)
 
     return {
         "mensaje": f"Canje exitoso de '{reward.nombre}'",
-        "puntos_restantes": wallet.puntos,
-        "stock_restante": reward.stock
+        "puntos_restantes": wallet.puntos
     }
 
 @router.put("/wallets/{usuario_id}/add")
