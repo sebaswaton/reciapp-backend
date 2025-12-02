@@ -123,8 +123,22 @@ def actualizar_solicitud(solicitud_id: int, nuevos_datos: dict, db: Session = De
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Solo admin o dueño
-    if current_user.rol != "admin" and solicitud.usuario_id != current_user.id:
+    # ✅ PERMITIR: Admin, dueño de la solicitud (ciudadano), o reciclador que la aceptó
+    es_admin = current_user.rol == "admin"
+    es_dueno = solicitud.usuario_id == current_user.id
+    es_reciclador_asignado = (
+        current_user.rol == "reciclador" and 
+        solicitud.reciclador_id == current_user.id
+    )
+    
+    # ✅ NUEVO: Permitir recicladores actualizar solicitudes que aceptan
+    es_reciclador_actualizando_estado = (
+        current_user.rol == "reciclador" and 
+        "estado" in nuevos_datos and 
+        nuevos_datos["estado"] in ["aceptada", "completada"]
+    )
+
+    if not (es_admin or es_dueno or es_reciclador_asignado or es_reciclador_actualizando_estado):
         raise HTTPException(status_code=403, detail="No tienes permisos para modificar esta solicitud")
 
     return crud_solicitud.update_solicitud(db, solicitud_id, nuevos_datos)
