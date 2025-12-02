@@ -8,11 +8,9 @@ class RewardBase(BaseModel):
 
 class RewardCreate(RewardBase):
     stock: int = 0
-    imagen_url: Optional[str] = None
 
 class RewardOut(RewardBase):
     id: int
     stock: int
-    imagen_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -9,4 +9,3 @@ class Reward(Base):
     descripcion = Column(String)
     costo_puntos = Column(Integer, nullable=False)
     stock = Column(Integer, default=0)  # NUEVO: Stock disponible
-    imagen_url = Column(String, nullable=True)
