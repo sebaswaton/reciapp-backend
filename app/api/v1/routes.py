@@ -102,8 +102,29 @@ def crear_solicitud(
 
 # Admin o reciclador pueden listar solicitudes
 @router.get("/solicitudes", response_model=list[schemas_solicitud.SolicitudOut])
-def listar_solicitudes(db: Session = Depends(get_db), _: Usuario = Depends(require_role("admin"))):
-    return crud_solicitud.get_solicitudes(db)
+def listar_solicitudes(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    """
+    - Admin: ve todas las solicitudes
+    - Reciclador: solo ve solicitudes pendientes o las que él aceptó
+    - Ciudadano: solo ve sus propias solicitudes
+    """
+    if current_user.rol == "admin":
+        return crud_solicitud.get_solicitudes(db)
+    
+    elif current_user.rol == "reciclador":
+        # Recicladores ven: pendientes + las que ellos aceptaron
+        todas = crud_solicitud.get_solicitudes(db)
+        return [
+            s for s in todas 
+            if s.estado == "pendiente" or s.reciclador_id == current_user.id
+        ]
+    
+    elif current_user.rol == "ciudadano":
+        # Ciudadanos solo ven sus propias solicitudes
+        todas = crud_solicitud.get_solicitudes(db)
+        return [s for s in todas if s.usuario_id == current_user.id]
+    
+    return []
 
 @router.get("/solicitudes/{solicitud_id}", response_model=schemas_solicitud.SolicitudOut)
 def obtener_solicitud(solicitud_id: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
