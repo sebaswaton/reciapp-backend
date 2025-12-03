@@ -129,12 +129,15 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 })
 
             elif message_type == "ubicacion_reciclador":
-                # Enviar ubicación del reciclador
+                # ✅ Reenviar ubicación del reciclador a TODOS (especialmente al ciudadano)
+                solicitud_id = message.get("solicitud_id")
+                print(f"📍 Ubicación reciclador: lat={message.get('lat')}, lng={message.get('lng')}, solicitud={solicitud_id}")
                 await manager.broadcast({
                     "type": "ubicacion_reciclador",
                     "lat": message.get("lat"),
                     "lng": message.get("lng"),
-                    "solicitud_id": message.get("solicitud_id")
+                    "solicitud_id": solicitud_id,
+                    "reciclador_id": user_id
                 })
 
             elif message_type == "rechazar_solicitud":
