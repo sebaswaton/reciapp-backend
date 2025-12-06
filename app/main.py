@@ -145,8 +145,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                     "usuario_id": user_id
                 })
 
+            elif message_type == "completar_solicitud":
+                # ✅ NUEVO: Notificar cuando se completa una solicitud
+                solicitud_id = message.get("solicitud_id")
+                print(f"✅ Solicitud {solicitud_id} completada por reciclador {user_id}")
+                await manager.broadcast({
+                    "type": "solicitud_completada",
+                    "solicitud_id": solicitud_id,
+                    "reciclador_id": user_id
+                })
+
             elif message_type == "ubicacion_reciclador":
-                # ✅ Reenviar ubicación del reciclador a TODOS (especialmente al ciudadano)
+                # Reenviar ubicación del reciclador a TODOS (especialmente al ciudadano)
                 solicitud_id = message.get("solicitud_id")
                 print(f"📍 Ubicación reciclador: lat={message.get('lat')}, lng={message.get('lng')}, solicitud={solicitud_id}")
                 await manager.broadcast({
