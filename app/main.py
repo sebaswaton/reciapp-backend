@@ -36,7 +36,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, WebSocket] = {}
 
     async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
+        # ✅ YA NO llamamos a accept() aquí, se hace en el endpoint
         self.active_connections[user_id] = websocket
         print(f"✅ Cliente conectado: {user_id}")
 
@@ -47,16 +47,27 @@ class ConnectionManager:
 
     async def send_personal_message(self, message: dict, user_id: str):
         if user_id in self.active_connections:
-            await self.active_connections[user_id].send_text(json.dumps(message))
+            try:
+                await self.active_connections[user_id].send_text(json.dumps(message))
+            except Exception as e:
+                print(f"❌ Error enviando mensaje a {user_id}: {e}")
+                self.disconnect(user_id)
 
     async def broadcast(self, message: dict):
         print(f"📢 Broadcasting a {len(self.active_connections)} conexiones activas")
+        disconnected_users = []
+        
         for user_id, connection in self.active_connections.items():
             try:
                 await connection.send_text(json.dumps(message))
                 print(f"   ✅ Mensaje enviado a usuario {user_id}")
             except Exception as e:
                 print(f"   ❌ Error enviando a usuario {user_id}: {e}")
+                disconnected_users.append(user_id)
+        
+        # Limpiar conexiones que fallaron
+        for user_id in disconnected_users:
+            self.disconnect(user_id)
 
 manager = ConnectionManager()
 
@@ -89,10 +100,16 @@ def healthcheck():
 # WebSocket endpoint
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    # ✅ PRIMERO: Aceptar la conexión ANTES de hacer cualquier otra cosa
+    await websocket.accept()
+    
+    # ✅ SEGUNDO: Agregar a conexiones activas
     await manager.connect(user_id, websocket)
     print(f"👥 Conexiones activas: {len(manager.active_connections)}")
+    
     try:
         while True:
+            # Ahora sí podemos recibir mensajes
             data = await websocket.receive_text()
             message = json.loads(data)
             message_type = message.get("type")
@@ -150,6 +167,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     except WebSocketDisconnect:
         manager.disconnect(user_id)
         print(f"👥 Conexiones activas después de desconexión: {len(manager.active_connections)}")
+    except Exception as e:
+        print(f"❌ Error en WebSocket para usuario {user_id}: {e}")
+        manager.disconnect(user_id)
 
 # Incluir routers
 app.include_router(routes_auth.router, prefix="/auth", tags=["Autenticación"])
