@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from app.services.analytics import get_resumen_general, get_resumen_por_tipo, export_resumen_csv
 from app.api.v1.dependencies import get_current_user
 import httpx
+import os
 from fastapi import HTTPException
 
 
@@ -365,28 +366,39 @@ def exportar_csv(db: Session = Depends(get_db)):
         headers={"Content-Disposition": "attachment; filename=reportes_reciclaje.csv"}
     )
 
-# ✅ PROXY PARA GOOGLE DIRECTIONS API (evita CORS)
+# ✅ PROXY PARA GOOGLE DIRECTIONS API (API Key en backend)
 @router.post("/proxy/directions")
 async def proxy_google_directions(request: dict):
     """
     Proxy para Google Directions API
-    Evita problemas de CORS en el frontend
+    La API Key está en el servidor, no se expone al cliente
     """
     origin = request.get("origin")
     destination = request.get("destination")
-    api_key = request.get("api_key")
     
-    if not all([origin, destination, api_key]):
-        raise HTTPException(status_code=400, detail="Faltan parámetros: origin, destination, api_key")
+    # ✅ LEER API KEY DESDE VARIABLE DE ENTORNO DEL BACKEND
+    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=500, 
+            detail="Google Maps API Key no configurada en el servidor"
+        )
+    
+    if not all([origin, destination]):
+        raise HTTPException(
+            status_code=400, 
+            detail="Faltan parámetros: origin, destination"
+        )
     
     url = "https://maps.googleapis.com/maps/api/directions/json"
     params = {
         "origin": origin,
         "destination": destination,
         "mode": "driving",
-        "key": api_key,
-        "language": "es",  # ✅ Instrucciones en español
-        "region": "pe"     # ✅ Optimizado para Perú
+        "key": api_key,  # ✅ Usa la key del servidor
+        "language": "es",
+        "region": "pe"
     }
     
     try:
@@ -401,7 +413,6 @@ async def proxy_google_directions(request: dict):
             
             data = response.json()
             
-            # ✅ Validar respuesta de Google
             if data.get("status") != "OK":
                 error_message = data.get("error_message", data.get("status"))
                 raise HTTPException(
