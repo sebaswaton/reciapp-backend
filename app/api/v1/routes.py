@@ -16,9 +16,6 @@ from app.schemas.reward import RewardCreate, RewardOut
 from fastapi.responses import StreamingResponse
 from app.services.analytics import get_resumen_general, get_resumen_por_tipo, export_resumen_csv
 from app.api.v1.dependencies import get_current_user
-import httpx
-import os
-from fastapi import HTTPException
 
 
 
@@ -365,64 +362,3 @@ def exportar_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reportes_reciclaje.csv"}
     )
-
-# ✅ PROXY PARA GOOGLE DIRECTIONS API (API Key en backend)
-@router.post("/proxy/directions")
-async def proxy_google_directions(request: dict):
-    """
-    Proxy para Google Directions API
-    La API Key está en el servidor, no se expone al cliente
-    """
-    origin = request.get("origin")
-    destination = request.get("destination")
-    
-    # ✅ LEER API KEY DESDE VARIABLE DE ENTORNO DEL BACKEND
-    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
-    
-    if not api_key:
-        raise HTTPException(
-            status_code=500, 
-            detail="Google Maps API Key no configurada en el servidor"
-        )
-    
-    if not all([origin, destination]):
-        raise HTTPException(
-            status_code=400, 
-            detail="Faltan parámetros: origin, destination"
-        )
-    
-    url = "https://maps.googleapis.com/maps/api/directions/json"
-    params = {
-        "origin": origin,
-        "destination": destination,
-        "mode": "driving",
-        "key": api_key,  # ✅ Usa la key del servidor
-        "language": "es",
-        "region": "pe"
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, params=params)
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code, 
-                    detail=f"Error de Google Maps: {response.text}"
-                )
-            
-            data = response.json()
-            
-            if data.get("status") != "OK":
-                error_message = data.get("error_message", data.get("status"))
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Google Maps error: {error_message}"
-                )
-            
-            return data
-            
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Timeout al conectar con Google Maps")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
