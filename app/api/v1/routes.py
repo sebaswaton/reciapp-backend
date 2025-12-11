@@ -16,6 +16,8 @@ from app.schemas.reward import RewardCreate, RewardOut
 from fastapi.responses import StreamingResponse
 from app.services.analytics import get_resumen_general, get_resumen_por_tipo, export_resumen_csv
 from app.api.v1.dependencies import get_current_user
+import httpx
+from fastapi import HTTPException
 
 
 
@@ -362,3 +364,54 @@ def exportar_csv(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=reportes_reciclaje.csv"}
     )
+
+# ✅ PROXY PARA GOOGLE DIRECTIONS API (evita CORS)
+@router.post("/proxy/directions")
+async def proxy_google_directions(request: dict):
+    """
+    Proxy para Google Directions API
+    Evita problemas de CORS en el frontend
+    """
+    origin = request.get("origin")
+    destination = request.get("destination")
+    api_key = request.get("api_key")
+    
+    if not all([origin, destination, api_key]):
+        raise HTTPException(status_code=400, detail="Faltan parámetros: origin, destination, api_key")
+    
+    url = "https://maps.googleapis.com/maps/api/directions/json"
+    params = {
+        "origin": origin,
+        "destination": destination,
+        "mode": "driving",
+        "key": api_key,
+        "language": "es",  # ✅ Instrucciones en español
+        "region": "pe"     # ✅ Optimizado para Perú
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code, 
+                    detail=f"Error de Google Maps: {response.text}"
+                )
+            
+            data = response.json()
+            
+            # ✅ Validar respuesta de Google
+            if data.get("status") != "OK":
+                error_message = data.get("error_message", data.get("status"))
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Google Maps error: {error_message}"
+                )
+            
+            return data
+            
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout al conectar con Google Maps")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
